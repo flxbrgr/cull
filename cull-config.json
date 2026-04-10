@@ -1,0 +1,17 @@
+{
+  "directions": {
+    "E":  { "id": "good",   "label": "GOOD",      "color": "good",  "angle": 0 },
+    "NE": { "id": "other",  "label": "OTHER",     "color": "other", "angle": -45 },
+    "N":  { "id": "regen",  "label": "REGENERATE","color": "regen", "angle": -90 },
+    "NW": { "id": "custom1","label": "ISSUE",     "color": "custom1","angle": -135 },
+    "W":  { "id": "bad",    "label": "BAD",       "color": "bad",   "angle": 180 },
+    "SW": { "id": "custom2","label": "LATER",     "color": "custom2","angle": 135 },
+    "S":  { "id": "scary",  "label": "SCARY",     "color": "scary", "angle": 90 },
+    "SE": { "id": "extra",  "label": "EXTRA",     "color": "extra", "angle": 45 }
+  },
+  "posthog": {
+    "enabled": false,
+    "apiKey": "",
+    "host": "https://das.flxbrgr.com"
+  }
+}

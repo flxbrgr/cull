@@ -1,0 +1,21 @@
+{
+  "name": "cull",
+  "version": "1.0.0",
+  "description": "General purpose image culling and review tool",
+  "main": "index.html",
+  "scripts": {
+    "generate-manifest": "tsx generate_manifest.ts",
+    "dev": "npx serve ."
+  },
+  "keywords": [
+    "culling",
+    "image-review",
+    "swipe"
+  ],
+  "author": "Felix Felixberger",
+  "license": "MIT",
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.2"
+  }
+}

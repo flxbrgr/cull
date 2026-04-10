@@ -1,0 +1,12 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+    
+    # Force JSON and other static assets to not cache if needed, 
+    # but usually handled by metadata versioning
+    
+    # Simple SPA-like handling if we ever use routing
+    # RewriteCond %{REQUEST_FILENAME} !-f
+    # RewriteCond %{REQUEST_FILENAME} !-d
+    # RewriteRule . /index.html [L]
+</IfModule>

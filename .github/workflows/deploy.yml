@@ -1,0 +1,66 @@
+name: Deploy Cull (Asset Reviewer)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      asset_repo:
+        description: 'Repo to scan for assets (e.g. flxbrgr/duelix)'
+        required: false
+        default: 'flxbrgr/duelix'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Cull (Tool)
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      # Optional: Checkout the asset repo if we want to bundle assets into the deployment
+      # For now, we assume the tool is deployed alongside assets on the server, 
+      # or it accesses them via absolute URLs.
+      # If we want to generate a manifest during CI, we need the assets here.
+      
+      - name: Checkout Assets (Duelix)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.asset_repo || 'flxbrgr/duelix' }}
+          path: 'source_project'
+          token: ${{ secrets.PAT_TOKEN }} # Needed to clone private repos
+
+      - name: Generate Manifest
+        run: |
+          export ASSETS_DIR="source_project/assets/decks"
+          # METADATA_FILE="source_project/metadata.json" # If duelix has one
+          npm run generate-manifest
+
+      - name: Cache Busting
+        run: |
+          sed -i "s/v=1/v=${{ github.run_number }}/g" index.html
+          sed -i "s/v1.0/v${{ github.run_number }}/g" index.html
+
+      - name: Deploy to Uberspace
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          
+          # Deploy to flxbrgr.com/cull
+          ssh ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} "mkdir -p ~/html/flxbrgr.com/cull"
+          
+          rsync -avz --delete \
+            --exclude '.git*' \
+            --exclude 'node_modules' \
+            --exclude 'source_project' \
+            ./ \
+            ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:~/html/flxbrgr.com/cull/

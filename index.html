@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
+    <title>Cull - Image Review</title>
+    <link rel="stylesheet" href="style.css?v=1">
+    <script src="manifest.js?v=1"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Top App Bar -->
+        <header>
+            <button class="m3-btn text" id="back-to-decks-btn" style="display: none;">
+                <span style="font-size: 1.2rem;">←</span> Back
+            </button>
+            <div id="header-spacer" style="display: block;"></div>
+            <h1>Cull <span id="app-version" style="font-size: 0.8rem; opacity: 0.5;">v1.0</span></h1>
+            <button class="m3-btn text" id="help-btn" style="min-width: 48px; padding: 0;">
+                <span style="font-size: 1.2rem;">?</span>
+            </button>
+        </header>
+
+        <!-- View 1: Collection Selection -->
+        <section id="view-decks" class="view-section">
+            <div style="text-align: center; margin-bottom: 24px;">
+                <h2 style="font-weight: 400; font-size: 1.5rem; margin-bottom: 8px;">Select Collections</h2>
+                <p style="color: var(--md-sys-color-on-surface-variant);">Choose one or more sets to review.</p>
+            </div>
+
+            <div id="deck-list" class="deck-grid">
+                <!-- Collections injected here -->
+            </div>
+
+            <div style="height: 80px;"></div>
+        </section>
+
+        <!-- FAB for starting -->
+        <button id="start-btn" class="fab extended" disabled>
+            <span class="icon">▶</span>
+            <span class="fab-text">Start Review</span>
+        </button>
+
+        <!-- View 2: Review Interface -->
+        <section id="view-review" class="view-section hidden" style="padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+            <div class="session-stats">
+                <span>Session: <span id="session-count" class="session-count">0</span></span>
+                <span id="progress-text">1 of X</span>
+                <div class="progress-bar-container" style="margin-top: 4px; width: 100px; height: 4px; background: rgba(0,0,0,0.1); border-radius: 2px;">
+                    <div id="progress-bar-fill" style="height: 100%; width: 0%; background: var(--md-sys-color-primary); border-radius: 2px; transition: width 0.3s;"></div>
+                </div>
+            </div>
+
+            <main class="card-viewer">
+                <div id="card-container" class="card-container">
+                    <div id="swipe-overlay" class="swipe-overlay">
+                        <div id="swipe-text" class="swipe-text">GOOD</div>
+                    </div>
+
+                    <div id="loading-indicator" class="loading">Loading...</div>
+                    <div id="error-indicator" class="loading" style="display:none; color: var(--md-sys-color-error);">Not Found (404)</div>
+                    <img id="current-image" class="card-image" alt="Asset">
+                </div>
+
+                <div class="card-info">
+                    <h2 id="card-name">Item Name</h2>
+                    <p id="deck-name">Collection Name</p>
+                    <div class="url-hint" id="image-url">url...</div>
+                </div>
+            </main>
+
+            <section class="controls-area">
+                <div class="action-buttons">
+                    <button class="m3-btn btn-action" data-action="bad">Left: Bad</button>
+                    <button class="m3-btn btn-action" data-action="regen">Up: Regen</button>
+                    <button class="m3-btn btn-action" data-action="scary">Down: Scary</button>
+                    <button class="m3-btn btn-action" data-action="good">Right: Good</button>
+                </div>
+                <div class="encouragement">Every vote counts! Feel free to stop anytime.</div>
+            </section>
+        </section>
+
+        <!-- View 3: Finished -->
+        <section id="view-finished" class="view-section hidden">
+            <div class="finished">
+                <div style="font-size: 4rem; margin-bottom: 16px;">🎉</div>
+                <h2>Review Complete!</h2>
+                <p>You reviewed <span id="finish-count">0</span> items.</p>
+                <div style="display: flex; gap: 16px; flex-direction: column; width: 100%; max-width: 300px;">
+                    <button id="export-btn" class="m3-btn filled" style="height: 48px;">📋 Copy Results</button>
+                    <button id="home-btn" class="m3-btn text" style="margin-top: 16px;">Back to Start</button>
+                </div>
+            </div>
+        </section>
+
+        <div id="toast" class="toast">Copied to clipboard</div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const DEFAULT_CONFIG = {
+            directions: {
+                'E':  { id: 'good',   label: 'GOOD',      color: 'good',  angle: 0    },
+                'NE': { id: 'other',  label: 'OTHER',     color: 'other', angle: -45  },
+                'N':  { id: 'regen',  label: 'REGENERATE',color: 'regen', angle: -90  },
+                'NW': { id: 'custom1',label: 'ISSUE',     color: 'custom1',angle: -135 },
+                'W':  { id: 'bad',    label: 'BAD',       color: 'bad',   angle: 180  },
+                'SW': { id: 'custom2',label: 'LATER',     color: 'custom2',angle: 135  },
+                'S':  { id: 'scary',  label: 'SCARY',     color: 'scary', angle: 90   },
+                'SE': { id: 'extra',  label: 'EXTRA',     color: 'extra', angle: 45   }
+            }
+        };
+
+        // --- DATA ---
+        let fullManifest = window.REVIEW_MANIFEST || [];
+        const collectionsMap = new Map();
+
+        fullManifest.forEach(item => {
+            const key = `reviewed_${item.deckId}_${item.cardId}`;
+            if (localStorage.getItem(key)) return;
+
+            const groupKey = item.deckId;
+            if (!collectionsMap.has(groupKey)) {
+                collectionsMap.set(groupKey, {
+                    id: groupKey,
+                    name: item.deckName,
+                    count: 0,
+                    image: item.image
+                });
+            }
+            collectionsMap.get(groupKey).count++;
+        });
+        const allCollections = Array.from(collectionsMap.values());
+
+        // --- STATE ---
+        let selectedIds = new Set();
+        let reviewQueue = [];
+        let currentIndex = 0;
+        let flaggedItems = [];
+        let sessionCount = 0;
+
+        // --- UI ELEMENTS ---
+        const views = {
+            decks: document.getElementById('view-decks'),
+            review: document.getElementById('view-review'),
+            finished: document.getElementById('view-finished')
+        };
+        const elDeckList = document.getElementById('deck-list');
+        const elStartBtn = document.getElementById('start-btn');
+        const elBackBtn = document.getElementById('back-to-decks-btn');
+        const elCardContainer = document.getElementById('card-container');
+        const elImage = document.getElementById('current-image');
+        const elSwipeOverlay = document.getElementById('swipe-overlay');
+        const elSwipeText = document.getElementById('swipe-text');
+        const elProgressText = document.getElementById('progress-text');
+        const elProgressBar = document.getElementById('progress-bar-fill');
+        const elSessionCount = document.getElementById('session-count');
+
+        // --- INIT ---
+        function init() {
+            renderCollections();
+            elStartBtn.onclick = startReview;
+            elBackBtn.onclick = () => switchView('decks');
+            document.getElementById('home-btn').onclick = () => location.reload();
+            document.getElementById('export-btn').onclick = exportReport;
+
+            document.querySelectorAll('.btn-action').forEach(btn => {
+                btn.onclick = () => handleAction(btn.dataset.action);
+            });
+
+            initSwipe();
+        }
+
+        function renderCollections() {
+            elDeckList.innerHTML = '';
+            allCollections.forEach(col => {
+                const card = document.createElement('div');
+                card.className = 'deck-card';
+                card.innerHTML = `
+                    <div style="width: 100%; height: 120px; background-image: url('${col.image}'); background-size: cover; background-position: center; border-radius: 8px 8px 0 0; margin-bottom: 8px;"></div>
+                    <div style="padding: 0 12px 12px 12px;">
+                        <h3>${col.name}</h3>
+                        <div class="count">${col.count} Items</div>
+                    </div>
+                `;
+                card.onclick = () => {
+                    if (selectedIds.has(col.id)) {
+                        selectedIds.delete(col.id);
+                        card.classList.remove('selected');
+                    } else {
+                        selectedIds.add(col.id);
+                        card.classList.add('selected');
+                    }
+                    elStartBtn.disabled = selectedIds.size === 0;
+                };
+                elDeckList.appendChild(card);
+            });
+        }
+
+        function startReview() {
+            reviewQueue = fullManifest.filter(item => selectedIds.has(item.deckId));
+            reviewQueue.sort(() => Math.random() - 0.5);
+            currentIndex = 0;
+            sessionCount = 0;
+            flaggedItems = [];
+            if (reviewQueue.length === 0) return;
+            switchView('review');
+            renderCard();
+        }
+
+        function renderCard() {
+            if (currentIndex >= reviewQueue.length) {
+                finishReview();
+                return;
+            }
+            const item = reviewQueue[currentIndex];
+            document.getElementById('card-name').textContent = item.cardName;
+            document.getElementById('deck-name').textContent = item.deckName;
+            document.getElementById('image-url').textContent = item.filename;
+            
+            elProgressText.textContent = `${currentIndex + 1} / ${reviewQueue.length}`;
+            elProgressBar.style.width = `${(currentIndex / reviewQueue.length) * 100}%`;
+            elSessionCount.textContent = sessionCount;
+
+            elImage.classList.remove('loaded');
+            elImage.src = item.image;
+            elImage.onload = () => elImage.classList.add('loaded');
+        }
+
+        function handleAction(action) {
+            const item = reviewQueue[currentIndex];
+            flaggedItems.push({ id: item.cardId, collection: item.deckId, flag: action });
+            localStorage.setItem(`reviewed_${item.deckId}_${item.cardId}`, action);
+            
+            sessionCount++;
+            currentIndex++;
+            renderCard();
+        }
+
+        function switchView(name) {
+            Object.keys(views).forEach(v => views[v].classList.add('hidden'));
+            views[name].classList.remove('hidden');
+            elBackBtn.style.display = name === 'review' ? 'flex' : 'none';
+        }
+
+        function finishReview() {
+            document.getElementById('finish-count').textContent = flaggedItems.length;
+            switchView('finished');
+        }
+
+        function exportReport() {
+            const json = JSON.stringify(flaggedItems, null, 2);
+            navigator.clipboard.writeText(json).then(() => {
+                const toast = document.getElementById('toast');
+                toast.classList.add('visible');
+                setTimeout(() => toast.classList.remove('visible'), 2000);
+            });
+        }
+
+        // --- 8-WAY SWIPE ENGINE ---
+        function initSwipe() {
+            let startX, startY, curX, curY;
+            let isDragging = false;
+            const threshold = 80;
+
+            const onStart = (e) => {
+                isDragging = true;
+                const point = e.touches ? e.touches[0] : e;
+                startX = point.clientX;
+                startY = point.clientY;
+                elCardContainer.style.transition = 'none';
+            };
+
+            const onMove = (e) => {
+                if (!isDragging) return;
+                const point = e.touches ? e.touches[0] : e;
+                curX = point.clientX - startX;
+                curY = point.clientY - startY;
+
+                const rotate = curX * 0.1;
+                elCardContainer.style.transform = `translate(${curX}px, ${curY}px) rotate(${rotate}deg)`;
+
+                // Calculate direction
+                const dist = Math.hypot(curX, curY);
+                if (dist > 20) {
+                    const angle = Math.atan2(curY, curX) * 180 / Math.PI; // -180 to 180
+                    const config = getDirectionConfig(angle);
+                    
+                    if (config) {
+                        elSwipeText.textContent = config.label;
+                        elSwipeText.className = `swipe-text ${config.color}`;
+                        elSwipeOverlay.style.opacity = Math.min(dist / threshold, 1);
+                    }
+                } else {
+                    elSwipeOverlay.style.opacity = 0;
+                }
+            };
+
+            const onEnd = () => {
+                if (!isDragging) return;
+                isDragging = false;
+                const dist = Math.hypot(curX, curY);
+                
+                if (dist > threshold) {
+                    const angle = Math.atan2(curY, curX) * 180 / Math.PI;
+                    const config = getDirectionConfig(angle);
+                    
+                    // Fly away
+                    elCardContainer.style.transition = 'transform 0.4s ease-out';
+                    elCardContainer.style.transform = `translate(${curX * 5}px, ${curY * 5}px)`;
+                    
+                    setTimeout(() => {
+                        handleAction(config.id);
+                        elCardContainer.style.transition = 'none';
+                        elCardContainer.style.transform = '';
+                    }, 300);
+                } else {
+                    elCardContainer.style.transition = 'transform 0.3s ease';
+                    elCardContainer.style.transform = '';
+                }
+                elSwipeOverlay.style.opacity = 0;
+            };
+
+            function getDirectionConfig(deg) {
+                // Normalize deg to 0 to 360
+                let normalized = (deg + 360) % 360;
+                // Steps of 45 degrees, centered on 0, 45, 90...
+                // Sectors are (center-22.5) to (center+22.5)
+                const sector = Math.round(normalized / 45) % 8;
+                const sectorKeys = ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE'];
+                return DEFAULT_CONFIG.directions[sectorKeys[sector]];
+            }
+
+            elCardContainer.addEventListener('mousedown', onStart);
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onEnd);
+            elCardContainer.addEventListener('touchstart', onStart, { passive: false });
+            document.addEventListener('touchmove', onMove, { passive: false });
+            document.addEventListener('touchend', onEnd);
+        }
+
+        init();
+    </script>
+</body>
+</html>
